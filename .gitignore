@@ -1,0 +1,18 @@
+# TFG
+
+assets/
+
+# cache files
+__pycache__/
+*.py[cod]
+
+# VS Code settings
+.vscode/
+
+# Logs and temporary files
+*.log
+*.tmp
+
+# OS files
+.DS_Store
+Thumbs.db
