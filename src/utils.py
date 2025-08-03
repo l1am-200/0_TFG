@@ -24,7 +24,7 @@ def input_validation(prompt, mode, **kwargs):
     elif mode == "int" or mode == "float":
         return validate_num(prompt, mode, kwargs.get("num_range"))
     elif mode == "dict":
-        return validate_dict(prompt, kwargs.get("dictionary"), kwargs.get("aliases"))
+        return validate_dict(prompt, kwargs.get("display"), kwargs.get("aliases"))
     else:
         print("Validation function error.")
 
@@ -58,14 +58,14 @@ def validate_num(prompt, mode, num_range=None):
             print("Invalid input. Please enter a", "n integer." if mode == "int" else " number.")
 
 # Dictionary input validation function:
-def validate_dict(prompt, dictionary, aliases):
+def validate_dict(prompt, display, aliases):
     """
     docstring
     Please note: prompts must be written in the following style: "Available [...]:". This function will automatically prompt the user for a choice.
     """
     while True:
         print(prompt)
-        for key in dictionary.keys():
+        for key in display:
             print(f"{key}")
         user_input = input("Choice: ").strip().lower()
         if user_input in aliases:

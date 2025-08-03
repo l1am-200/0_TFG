@@ -1,8 +1,13 @@
 # TFG
 
+# Folders
 assets/
 
-# cache files
+# Files
+epsilon_NTU.py
+F_factor.py
+
+# Cache files
 __pycache__/
 *.py[cod]
 

@@ -7,11 +7,16 @@ from CoolProp.CoolProp import PropsSI
 import utils as ut
 from dataclasses import dataclass
 
-# Plate material dictionary:
-plate_materials = {
-    'Aluminum': 'Al',
-    'Copper': 'Cu'
+# Sweepable fixed-plate variable dictionary:
+sweep_fp = {
+
 }
+
+# Plate material list:
+plate_materials = [
+    'Aluminum',
+    'Copper'
+]
 
 # Plate material dictionary key aliases:
 material_aliases = {
@@ -121,7 +126,7 @@ def fixed_plate_inputs():
     """
     docstring
     """
-    material = ut.input_validation("Available plate materials: ", "dict", dictionary=plate_materials, aliases=material_aliases) # plate material (chosen from list)
+    material = ut.input_validation("Available plate materials: ", "dict", display=plate_materials, aliases=material_aliases) # plate material (chosen from list)
     K_plates = K_metals[material]
     N_p = ut.input_validation("Enter number of plates: ", "int")                                    # number of plates
     L_p = ut.input_validation("Enter plate effective length [m]: ", "float")                        # plate effective length [m]
@@ -293,7 +298,7 @@ def fixed_plate_UA(fixed_plate_dict, hot_param_update_dict, cold_param_update_di
 
     return U_total, area
 
-def counterflow_output(P_ATM, hot_inlet_dict, cold_inlet_dict, hot_param_update_dict, cold_param_update_dict, area, U_total):
+def counterflow_output(P_ATM, inlet_std, hot_param_update_dict, cold_param_update_dict, area, U_total):
     """
     Calculates NTU, epsilon, transferred heat and outlet temperatures for a fixed-plate counterflow heat exchanger.
 
@@ -310,11 +315,11 @@ def counterflow_output(P_ATM, hot_inlet_dict, cold_inlet_dict, hot_param_update_
         Outlet temperature of the hot stream [K]
     """
     # input extraction
-    T_hot_in_K = hot_inlet_dict["T_in_K"]
-    T_cold_in_K = cold_inlet_dict["T_in_K"]
-    W_hot_in = hot_inlet_dict["W_in"]
-    W_cold_in = cold_inlet_dict["W_in"]
-    T_dew_hot_K = hot_inlet_dict["T_dew_K"]
+    T_hot_in_K = inlet_std["T_hot_in_K"]
+    T_cold_in_K = inlet_std["T_cold_in_K"]
+    W_hot_in = inlet_std["W_hot_in"]
+    W_cold_in = inlet_std["W_cold_in"]
+    T_dew_hot_K = inlet_std["T_dew_hot_K"]
 
     m_dot_hot = hot_param_update_dict["m_dot"]
     m_dot_cold = cold_param_update_dict["m_dot"]
@@ -323,7 +328,6 @@ def counterflow_output(P_ATM, hot_inlet_dict, cold_inlet_dict, hot_param_update_
 
     C_max = max((cp_hot * m_dot_hot), (cp_cold * m_dot_cold))
     C_min = min((cp_hot * m_dot_hot), (cp_cold * m_dot_cold))
-    print(f"C_min = {C_min:.2f} W/K")
     R_param = C_min / C_max
     NTU_param = (U_total * area) / C_min
 
