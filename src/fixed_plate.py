@@ -5,12 +5,6 @@ import numpy as np
 from CoolProp.HumidAirProp import HAPropsSI
 from CoolProp.CoolProp import PropsSI
 import utils as ut
-from dataclasses import dataclass
-
-# Sweepable fixed-plate variable dictionary:
-sweep_fp = {
-
-}
 
 # Plate material list:
 plate_materials = [
@@ -201,7 +195,6 @@ def thermal_resistance(param_update_dict, fixed_plate_dict):
     visc_wall = param_update_dict["visc_wall"]
 
     N_p = fixed_plate_dict["N_p"]
-    L_p = fixed_plate_dict["L_p"]
     plate_width = fixed_plate_dict["plate_width"]
     chevron_angle = fixed_plate_dict["chevron_angle"]
     corr_ampl = fixed_plate_dict["corr_ampl"]

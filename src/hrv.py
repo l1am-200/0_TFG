@@ -7,15 +7,6 @@ houses things specific to Heat Recovery Ventilators (HRVs)
 import utils as ut
 from CoolProp.HumidAirProp import HAPropsSI
 
-# Sweepable variables:
-sweep_hrv = [
-    'T_ext',
-    'RH_ext',
-    'T_int',
-    'RH_int',
-    'v_dot'
-]
-
 # HRV inlet prompts:
 def inlet_prompts():
     """
@@ -76,6 +67,8 @@ def inlet_extras(P_ATM, T_in_K, RH_in):
 
         Parameters
         ----------
+        P_ATM : float
+            Atmospheric pressue [Pa]
         T_in_K : float
             Inlet temperature of the specified flow [K]
         RH_in : float
@@ -95,12 +88,11 @@ def inlet_extras(P_ATM, T_in_K, RH_in):
 
 # LOGIC:
 
-def hrv_logic(P_ATM):
+def hrv_logic(P_ATM, hrv_input_dict):
     """
     docstring
     """
     # current operating mode: HRV (Heat Recovery Ventilator)
-    hrv_input_dict = inlet_prompts()
     v_dot = hrv_input_dict["v_dot"]
 
     inlet_sort_dict = inlet_sorting(hrv_input_dict)
