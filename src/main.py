@@ -22,8 +22,8 @@
 
 import utils as ut
 import variable_sweeps as vs
-import hrv
-import fixed_plate as fp
+import modules.hvac.hrv as hrv
+import exchangers.fixed_plate as fp
 
 def main():
     """
@@ -31,6 +31,42 @@ def main():
     """
     
     P_ATM = 101325      # pressure [Pa]             #### USER-INPUTTED PRESSURE?
+
+    # Module and mode dictionary:
+    module_dict = {
+        "hvac": {
+            "name": "HVAC",
+            "modes": {
+                "hrv": "HRV (Heat Recovery Ventilator)"
+            }
+        }
+    }
+
+    # Heat exchanger dictionary:
+    heat_ex_dict = {
+        "fixed_plate": {
+            "name": "Fixed-Plate",
+            "subtypes": {
+                "counterflow": "Counterflow"
+            }
+        }
+    }
+
+    # Module and mode selection function:
+    def module_select():
+        """
+        docstring
+        """
+        print("Select program module to work in:")
+        for i, module in enumerate(module_dict):
+            print(f"{i+1} : {module_dict[module]["name"]}") ####UNFINISHED UNFINISHED UNFINISHED
+        '''this needs to return a variable (no name restriction here) that is assigned [fp] and maybe a dictionary that specifies what module and mode we're in'''
+    
+    # Heat exchanger selection function:
+    def heat_ex_select():
+        """
+        docstring
+        """
     
     # Function to update the average temperature:
     def temp_avg(T_in_K, T_out_K):
@@ -52,7 +88,7 @@ def main():
         T_avg_K = (T_in_K + T_out_K) / 2
         return T_avg_K
         
-    # Iteration loop function
+    # Iteration loop function:
     def run_iteration(hrv_inlet_std, fixed_plate_dict):
         """
         docstring

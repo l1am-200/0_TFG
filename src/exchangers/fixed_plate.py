@@ -40,7 +40,7 @@ z_array = [[1, 0.589, 0.183], [1, 0.652, 0.206], [1, 0.631, 0.161], [1, 0.457, 0
 # Function to update the wall temperature:
 def temp_wall(T_avg_hot_K, T_avg_cold_K):
     """
-    Calculates the temperature (average) at the plate surfaces inside the heat exchanger.
+    Calculates the temperature (average) at the plate surfaces inside the heat exchanger. Fixed-plate-specific calculation.
 
     Parameters
     ----------
