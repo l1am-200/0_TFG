@@ -9,6 +9,9 @@ Essentially, what I need to do is take the chosen variables and values, and repl
 take my list of values for T_ext and insert that into the iteration function somehow.'''
 
 import utils as ut
+import core.heatx as hx
+import modules.hvac.hrv as hrv
+import exchangers.fixed_plate as fp
 import numpy as np
 
 # Sweep modes:
@@ -46,32 +49,32 @@ sweep_variables = {
     },
     "N_p": {
         "label": "Number of plates",
-        "component": "fp",
+        "component": "fixed_plate",
         "sweep_type": "sec"
     },
     "L_p": {
         "label": "Effective plate length [m]",
-        "component": "fp",
+        "component": "fixed_plate",
         "sweep_type": "sec"
     },
     "plate_width": {
         "label": "Plate width [m]",
-        "component": "fp",
+        "component": "fixed_plate",
         "sweep_type": "sec"
     },
     "plate_thickness": {
         "label": "Plate thickness [m]",
-        "component": "fp",
+        "component": "fixed_plate",
         "sweep_type": "sec"
     },
     "chevron_angle": {
         "label": "Chevron angle [º]",
-        "component": "fp",
+        "component": "fixed_plate",
         "sweep_type": "sec"
     },
     "corr_ampl": {
         "label": "Corrugation amplitude [m]",
-        "component": "fp",
+        "component": "fixed_plate",
         "sweep_type": "sec"
     }
 }
@@ -98,9 +101,12 @@ sweep_variables = {
     },
 '''
 
-# Component lookup:
 
 # Variable sweep prompts:
+def conduct_sweep():
+    sweep_ok = ut.input_validation("Conduct variable sweep? [y/n]: ", "y/n")
+    return sweep_ok
+
 def select_sweep_mode():
     """
     docstring
@@ -118,8 +124,19 @@ def sweep_type_filter(sweep_type):
     """
     return {key: var for key, var in sweep_variables.items() if var["sweep_type"] == sweep_type or var["sweep_type"] == "both"}
 
+# Function to highjack inputs:
+def highjack(target_dict, var, vals):
+    """
+    docstring
+    """
+    target_dict_list = []
+    for val in vals:
+        target_dict[var] = val
+        target_dict_list.append(target_dict)
+    return target_dict_list
+
 # Function to set up variable sweeps:
-def sweep_setup(sweep_mode):
+def sweep_setup(sweep_mode): ####not refactored, and missing module info: should not allow user to select a variable from a module different to the one running!
     """
     docstring
     """
@@ -141,57 +158,56 @@ def sweep_setup(sweep_mode):
     vals1 = np.arange(start1, stop1, step1)
 
     if sweep_mode == 1:
-        return var1, vals1
-    
-    # secondary variable
-    sec_vars = sweep_type_filter("sec")
-    sec_keys = [key for key in sec_vars if key != var1]
+        sweep_params = {
+            "var1": var1,
+            "vals1": vals1,
+            "var2": None,
+            "vals2": None
+        }
+        return sweep_params
+    else:
+        # secondary variable
+        sec_vars = sweep_type_filter("sec")
+        sec_keys = [key for key in sec_vars if key != var1]
 
-    print("Select secondary variable to sweep:")
-    for i, var in enumerate(sec_keys):
-        print(f"{i+1} : {sec_vars[var]["label"]}") ####can always change this to show the actual variable name
-    
-    sec_idx = ut.input_validation("Enter variable number: ", "int", num_range=(1, len(sec_keys)))
-    var2 = sec_keys[sec_idx]
-    start2 = ut.input_validation("Sweep start value: ", "float") ####add num range somehow
-    stop2 = ut.input_validation("Sweep stop value: ", "float") ####same here
-    step2 = ut.input_validation("Step: ", "float") ####same here
-    vals2 = np.arange(start2, stop2, step2)
+        print("Select secondary variable to sweep:")
+        for i, var in enumerate(sec_keys):
+            print(f"{i+1} : {sec_vars[var]["label"]}") ####can always change this to show the actual variable name
+        
+        sec_idx = ut.input_validation("Enter variable number: ", "int", num_range=(1, len(sec_keys)))
+        var2 = sec_keys[sec_idx]
+        start2 = ut.input_validation("Sweep start value: ", "float") ####add num range somehow
+        stop2 = ut.input_validation("Sweep stop value: ", "float") ####same here
+        step2 = ut.input_validation("Step: ", "float") ####same here
+        vals2 = np.arange(start2, stop2, step2)
 
-    return var1, vals1, var2, vals2
-
-# Function to modify sweepable variables source dictionary:
-def highjack(component_lookup, var, val):
-    """
-    docstring
-    """
-    for key in sweep_variables.keys():
-        component = sweep_variables[key]["component"]
-        target_dict = component_lookup[component]
-        if var in target_dict:
-            target_dict[var] = val
-            found = True
-            break
-        if not found:
-            print(f"ERROR: variable {var} not found in any target dictionary.")
+        sweep_params = {
+            "var1": var1,
+            "vals1": vals1,
+            "var2": var2,
+            "vals2": vals2
+        }
+        return sweep_params
 
 
 # Function that handles all sweep logic:
-def sweep_logic():
+def dispatch(target_dict_var1, target_dict_var2):
     """
     docstring
-
-    Returns
-    -------
-    sweep_elements : tuple
-        Tuple containing sweep variables and their values. Structure: (vals, var) for single-variable sweep, (vals1, vals2, var1, var2) for multi-variable sweep.
     """
-    # ...
+    # sweep setup
     sweep_mode = select_sweep_mode()
-    if sweep_mode == 1:
-        var1, vals1 = sweep_setup(sweep_mode)
-        sweep_elements = (vals1, var1)
+    sweep_params = sweep_setup(sweep_mode)
+
+    # parameter extraction
+    var1 = sweep_params["var1"]
+    var2 = sweep_params["var2"]
+    vals1 = sweep_params["vals1"]
+    vals2 = sweep_params["vals2"]
+    
+    target_dict_list1 = highjack(target_dict_var1, var1, vals1)
+    if var2 is not None:
+        target_dict_list2 = highjack(target_dict_var2, var2, vals2)
     else:
-        var1, vals1, var2, vals2 = sweep_setup(sweep_mode)
-        sweep_elements = (vals2, vals1, var2, var1)
-    return sweep_elements
+        target_dict_list2 = target_dict_var2
+    return target_dict_list1, target_dict_list2

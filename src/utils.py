@@ -1,6 +1,19 @@
 # TFG
 # Script housing a series of functions used throughout the program ((work on this))
 
+# Import management:
+import core.heatx as hx
+import analysis.plots as pl
+import modules.hvac.hrv as hrv
+import exchangers.fixed_plate as fp
+
+file_management = {
+    "heatx": hx,
+    "plots": pl,
+    "hrv": hrv,
+    "fixed_plate": fp
+}
+
 # Main input validation function:
 def input_validation(prompt, mode, **kwargs):
     """

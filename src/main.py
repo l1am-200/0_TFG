@@ -21,6 +21,7 @@
 '''
 
 import utils as ut
+import core.heatx as hx
 import variable_sweeps as vs
 import modules.hvac.hrv as hrv
 import exchangers.fixed_plate as fp
@@ -32,215 +33,36 @@ def main():
     
     P_ATM = 101325      # pressure [Pa]             #### USER-INPUTTED PRESSURE?
 
-    # Module and mode dictionary:
-    module_dict = {
-        "hvac": {
-            "name": "HVAC",
-            "modes": {
-                "hrv": "HRV (Heat Recovery Ventilator)"
-            }
-        }
-    }
-
-    # Heat exchanger dictionary:
-    heat_ex_dict = {
-        "fixed_plate": {
-            "name": "Fixed-Plate",
-            "subtypes": {
-                "counterflow": "Counterflow"
-            }
-        }
-    }
-
-    # Module and mode selection function:
-    def module_select():
-        """
-        docstring
-        """
-        print("Select program module to work in:")
-        for i, module in enumerate(module_dict):
-            print(f"{i+1} : {module_dict[module]["name"]}") ####UNFINISHED UNFINISHED UNFINISHED
-        '''this needs to return a variable (no name restriction here) that is assigned [fp] and maybe a dictionary that specifies what module and mode we're in'''
-    
-    # Heat exchanger selection function:
-    def heat_ex_select():
-        """
-        docstring
-        """
-    
-    # Function to update the average temperature:
-    def temp_avg(T_in_K, T_out_K):
-        """
-        Calculates the average temperature for the specified heat exchanger flow. To be applied to each flow.
-
-        Parameters
-        ----------
-        T_in_K : float
-            Inlet temperature [K]
-        T_out_K : float
-            Outlet temperature [K]
-        
-        Returns
-        -------
-        T_avg_K : float
-            Average stream temperature [K]
-        """
-        T_avg_K = (T_in_K + T_out_K) / 2
-        return T_avg_K
-        
-    # Iteration loop function:
-    def run_iteration(hrv_inlet_std, fixed_plate_dict):
-        """
-        docstring
-        """
-
-        # Input extraction
-        T_hot_in_K = hrv_inlet_std["T_hot_in_K"]
-        T_cold_in_K = hrv_inlet_std["T_cold_in_K"]
-        v_dot = hrv_inlet_std["v_dot"]
-        W_hot_in = hrv_inlet_std["W_hot_in"]
-        W_cold_in = hrv_inlet_std["W_cold_in"]
-
-        # Temperature iterative loop variable initiation
-        T_hot_out_K = T_hot_in_K
-        T_hot_out_K_old = -273.15
-        T_cold_out_K = T_cold_in_K
-        T_cold_out_K_old = -273.15
-
-        iteration_num = 0
-
-        # Iteration loop:
-        try:
-            while True:
-                # Remaining inlet conditions and other parameters
-                T_avg_hot_K = temp_avg(T_hot_in_K, T_hot_out_K)
-                T_avg_cold_K = temp_avg(T_cold_in_K, T_cold_out_K)
-                T_wall_K = fp.temp_wall(T_avg_hot_K, T_avg_cold_K)
-
-                hot_param_update_dict = fp.param_update(P_ATM, T_avg_hot_K, T_wall_K, W_hot_in, v_dot)
-                cold_param_update_dict = fp.param_update(P_ATM, T_avg_cold_K, T_wall_K, W_cold_in, v_dot)
-
-                U_total, area = fp.fixed_plate_UA(fixed_plate_dict, hot_param_update_dict, cold_param_update_dict)
-
-                output_dict = fp.counterflow_output(P_ATM, hrv_inlet_std, hot_param_update_dict, cold_param_update_dict, area, U_total)
-                iteration_num += 1
-
-                T_hot_out_K = output_dict["T_hot_out_K"]
-                T_cold_out_K = output_dict["T_cold_out_K"]
-                q_real = output_dict["q_real"]
-
-                if abs(T_hot_out_K - T_hot_out_K_old) <= 0.05 and abs(T_cold_out_K - T_cold_out_K_old) <= 0.05:
-                    break
-                else:
-                    T_hot_out_K_old = T_hot_out_K
-                    T_cold_out_K_old = T_cold_out_K
-
-        except KeyboardInterrupt:
-            print("\nCalculations interrupted.") ####placeholder
-            
-        results = {
-            "q_real": q_real,
-            "T_hot_out_K": T_hot_out_K,
-            "T_cold_out_K": T_cold_out_K,
-            "iteration_num": iteration_num
-        }
-            
-        return results
-
 
     # LOGIC:
 
     try:
-        # Program startup
-        print("\n...\nCurrent functionalities:\n...")
-        print("\nCurrent mode: HRV (Heat Recovery Ventilator)\nPress [ctrl]+[c] at any moment to exit the program\n")
+        # Program startup:
+        print("\nPROGRAM STARTUP\n")
+
+        # Module and selection:
+        module, mode = hx.module_select(hx.module_dict)
+
+        # Heat exchanger selection:
+        heat_ex_type, heat_ex_subtype = hx.heat_ex_select(hx.heat_ex_dict)
+
+        print(f"\nModule : {hx.module_dict[module]["name"]}\n  Mode : {hx.module_dict[module]["modes"][mode]}") if mode is not None else print(f"\nModule : {hx.module_dict[module]["name"]}")
+        print(f"\nHeat exchanger : {hx.heat_ex_dict[heat_ex_type]["name"]}") ####missing subtype print
 
         metadata = {
-            "module": "hvac",
-            "mode": "hrv",
-            "heat_exchanger": "fixed_plate",
-            "counterflow": "true"
+            "module": module,
+            "mode": mode,
+            "heat_ex_type": heat_ex_type,
+            "heat_ex_subtype": heat_ex_subtype
         }
+
         results_list = []
 
-        # Inputs:       (to be modified/moved in the future)
-        hrv_input_dict = hrv.inlet_prompts()
-        fixed_plate_dict = fp.fixed_plate_inputs()
-        metadata["hrv_inputs"] = hrv_input_dict
-        metadata["fixed_plate_inputs"] = fixed_plate_dict
+        print("\nVariable sweep:")
+        sweep_ok = vs.conduct_sweep()
 
-        # Component lookup:
-        component_lookup = {
-            "hrv": hrv_input_dict,
-            "fp": fixed_plate_dict
-        }
-
-        # Variable sweep prompt
-        sweep_ok = ut.input_validation("Conduct variable sweep? [y/n]: ", "y/n")
-        if sweep_ok == "y":
-            # import sweep elements (variables and values)
-            sweep_elements = vs.sweep_logic()
-
-            if len(sweep_elements) == 4:
-                # element extraction
-                vals2 = sweep_elements[0]
-                vals1 = sweep_elements[1]
-                var2 = sweep_elements[2]
-                var1 = sweep_elements[4]
-                # metadata
-                metadata["sweep_var1"] = {"variable": var1, "values": vals1}
-                metadata["sweep_var2"] = {"variable": var2, "values": vals2}
-                for val in vals2:
-                    vs.highjack(component_lookup, var2, val)
-                    for val in vals1:
-                        vs.highjack(component_lookup, var1, val)
-                        hrv_inlet_std = hrv.hrv_logic(P_ATM, hrv_input_dict)
-                        results = run_iteration(hrv_inlet_std, fixed_plate_dict)
-                        results_list.append(results)
-            elif len(sweep_elements) == 2:
-                # element extraction
-                vals1 = sweep_elements[0]
-                var1 = sweep_elements[1]
-                # metadata
-                metadata["sweep_var1"] = {"variable": var1, "values": vals1}
-                metadata["sweep_var2"] = False
-                for val in vals1:
-                    vs.highjack(component_lookup, var1, val)
-                    hrv_inlet_std = hrv.hrv_logic(P_ATM, hrv_input_dict)
-                    results = run_iteration(hrv_inlet_std, fixed_plate_dict)
-                    results_list.append(results)
-
-            # magic
-            '''
-            for i in enumerate((len(sweep_elements)/2)-1):      # len(sweep_elements) is either 2 or 4, so (len(sweep_elements)/2)-1 is either 0 or 1
-                for val in sweep_elements[i]:
-                    vs.highjack((len(sweep_elements)/2), val)
-                    if len(sweep_elements) == 4:
-                        for val in sweep_elements[1]:
-                            vs.highjack(sweep_elements[3], val)
-                            hrv_inlet_std = hrv.hrv_logic(P_ATM, hrv_input_dict)
-                            results = run_iteration(hrv_inlet_std, fixed_plate_dict)
-                            results_list.append(results)
-                    else:
-                        hrv_inlet_std = hrv.hrv_logic(P_ATM, hrv_input_dict)
-                        results = run_iteration(hrv_inlet_std, fixed_plate_dict)
-            '''
-
-        else:
-            print("Single simulation mode selected")
-            hrv_inlet_std = hrv.hrv_logic(P_ATM, hrv_input_dict)
-            results = run_iteration(hrv_inlet_std, fixed_plate_dict)
-            results_list.append(results)
-            # metadata
-            metadata["sweep_var1"] = False
-            metadata["sweep_var2"] = False
-            metadata["iteration_num"] = results["iteration_num"]
-
-        # Results
-        results = run_iteration(hrv_inlet_std, fixed_plate_dict)
-        print("\nResults:")
-        for key, item in results.items():
-            print(key, "->", item)
+        if mode == "hrv":
+            calc_results_list = hrv.dispatch(P_ATM, sweep_ok, heat_ex_type)
     
     except KeyboardInterrupt:
         print("\nProgram interrupted")

@@ -5,8 +5,10 @@ houses things specific to Heat Recovery Ventilators (HRVs)
 '''
 
 import utils as ut
-import core.engineering_logic as enl
+import variable_sweeps as vs
+import core.heatx as hx
 import exchangers.fixed_plate as fp
+
 from CoolProp.HumidAirProp import HAPropsSI
 from CoolProp.CoolProp import PropsSI
 
@@ -152,9 +154,6 @@ def param_update(P_ATM, T_avg_K, T_wall_K, W, v_dot, m_dot_cond=0):
 
     return param_update_dict
 
-
-# LOGIC:
-
 # Creation of standardized HRV inlet dictionary:
 def inlet_standard(P_ATM, hrv_input_dict):
     """
@@ -190,7 +189,7 @@ def inlet_standard(P_ATM, hrv_input_dict):
     return hrv_inlet_std
 
 # Execution of HRV-specific calculations:
-def hrv_interation(hrv_inlet_std):
+def hrv_iteration(P_ATM, heat_ex_prefix, hrv_inlet_std, exchanger_dict):
     """
     docstring
     """
@@ -200,4 +199,69 @@ def hrv_interation(hrv_inlet_std):
     W_hot_in = hrv_inlet_std["W_hot_in"]
     W_cold_in = hrv_inlet_std["W_cold_in"]
 
-    T_hot_out_K, T_hot_out_K_old, T_cold_out_K, T_cold_out_K_old = enl.temp_init(T_hot_in_K, T_cold_in_K)
+    T_hot_out_K, T_hot_out_K_old, T_cold_out_K, T_cold_out_K_old = hx.temp_init(T_hot_in_K, T_cold_in_K)
+
+    iteration_num = 0
+
+    # Iteration loop
+    try:
+        while True:
+            # Remaining inlet conditions and other parameters
+            T_avg_hot_K = hx.temp_avg(T_hot_in_K, T_hot_out_K)
+            T_avg_cold_K = hx.temp_avg(T_cold_in_K, T_cold_out_K)
+            T_wall_K = heat_ex_prefix.temp_wall(T_avg_hot_K, T_avg_cold_K)
+
+            hot_param_update_dict = param_update(P_ATM, T_avg_hot_K, T_wall_K, W_hot_in, v_dot)
+            cold_param_update_dict = param_update(P_ATM, T_avg_cold_K, T_wall_K, W_cold_in, v_dot)
+
+            U_total, area = heat_ex_prefix.calculate_UA(exchanger_dict, hot_param_update_dict, cold_param_update_dict)
+
+            output_dict = heat_ex_prefix.counterflow_output(P_ATM, hrv_inlet_std, hot_param_update_dict, cold_param_update_dict, area, U_total) ####not refactored
+            iteration_num += 1
+
+            T_hot_out_K = output_dict["T_hot_out_K"]
+            T_cold_out_K = output_dict["T_cold_out_K"]
+            q_real = output_dict["q_real"]
+
+            if abs(T_hot_out_K - T_hot_out_K_old) <= 0.05 and abs(T_cold_out_K - T_cold_out_K_old) <= 0.05:
+                break
+            else:
+                T_hot_out_K_old = T_hot_out_K
+                T_cold_out_K_old = T_cold_out_K
+    except KeyboardInterrupt:
+        print("Calculations interrupted") ####placeholder
+    
+    calc_results = {
+        "q_real": q_real,
+        "T_hot_out_K": T_hot_out_K,
+        "T_cold_out_K": T_cold_out_K,
+        "iteration_num": iteration_num
+    }
+    return calc_results
+
+
+# HRV function dispatch:
+def dispatch(P_ATM, sweep_ok, heat_ex_type):
+    """
+    docstring
+    """
+    # inputs
+    hrv_input_dict = inlet_prompts()
+    heat_ex_prefix = hx.exchanger_prefix(heat_ex_type)
+    exchanger_dict = heat_ex_prefix.exchanger_inputs()
+
+    calc_results_list = []
+
+    if sweep_ok == "y":
+        target_dict_list1, target_dict_list2 = vs.dispatch(hrv_input_dict, exchanger_dict) ####manually assigning var2 a dictionary, fix this!
+        for dict_var2 in target_dict_list2:
+            for dict_var1 in target_dict_list1:
+                hrv_inlet_std = inlet_standard(P_ATM, dict_var1)
+                calc_results = hrv_iteration(P_ATM, heat_ex_prefix, hrv_inlet_std, dict_var2)
+                calc_results_list.append(calc_results)
+    else:
+        hrv_inlet_std = inlet_standard(P_ATM, hrv_input_dict)
+        calc_results = hrv_iteration(P_ATM, heat_ex_prefix, hrv_inlet_std, exchanger_dict)
+        calc_results_list.append(calc_results)
+    
+    return calc_results_list

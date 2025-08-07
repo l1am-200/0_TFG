@@ -1,10 +1,12 @@
 # TFG
 # Script for UA and geometry calculations for fixed-plate heat exchangers
 
+import utils as ut
+import variable_sweeps as vs
+
 import numpy as np
 from CoolProp.HumidAirProp import HAPropsSI
 from CoolProp.CoolProp import PropsSI
-import utils as ut
 
 # Plate material list:
 plate_materials = [
@@ -57,66 +59,7 @@ def temp_wall(T_avg_hot_K, T_avg_cold_K):
     T_wall_K = (T_avg_hot_K + T_avg_cold_K) / 2
     return T_wall_K
 
-# Function to update parameters for iteration (description can be worked on):
-def param_update(P_ATM, T_avg_K, T_wall_K, W, v_dot, m_dot_cond=0):
-    """
-    Updates parameters/variables used for later calculations based on the inputs. To be used inside an iteration loop and to be applied to each flow.
-
-    Parameters
-    ----------
-    P_ATM : float
-        Atmospheric pressure [Pa]
-    T_avg_K : float
-        Average temperature of the specified flow [K]
-    T_wall_K : float
-        Average temperature at the surface of the heat exchanger's plates (independent of specified flow) [K]
-    W : float
-        Humidity ratio of the specified flow [-]
-    v_dot : float
-        Volumetric flow rate of the specified flow [m3/s]
-    m_dot_cond : float
-        Mass flow rate of condensate [kg/s]. defaults to 0 if left unspecified.
-
-    Returns
-    -------
-    m_dot : float
-        Updated mass flow rate for the specified flow [kg/s]
-    cp : float
-        Updated specific heat capacity at constant pressure for the specified flow [J/kg·K]
-    K_air : float
-        Updated thermal conductivity of the air for the specified flow [W/m·K]
-    visc : float
-        Updated viscosity of the air for the specified flow, evaluated at the average temperature for that flow [Pa·s]
-    visc_wall : float
-        Updated viscosity of the air, evaluated at wall temperature (average surface temperature of the plates in the heat exchanger), flow-independent [Pa·s]
-    m_dot_min : float
-        Updated mass flow rate of the specified flow, obtained by subtracting the condensate mass flow rate [kg/s]
-    """
-    P_w = HAPropsSI('P_w', 'T', T_avg_K, 'P', P_ATM, 'W', W)
-    P_d = P_ATM - P_w
-    rho_dry = PropsSI('D', 'T', T_avg_K, 'P', P_d, 'Air')
-    rho_vap = PropsSI('D', 'T', T_avg_K, 'P', P_w, 'Water')
-    rho = rho_dry + (W * rho_vap)                                                               # density [Kg/m3]
-    m_dot = rho * v_dot                                                                         # mass flow rate [Kg/s]
-    cp = HAPropsSI('C', 'T', T_avg_K, 'P', P_ATM, 'W', W)                                       # specific heat [J/Kg·K]
-    K_air = HAPropsSI('K', 'T', T_avg_K, 'P', P_ATM, 'W', W)                                    # conductivity [W/m·K]
-    visc = PropsSI('VISCOSITY', 'T', T_avg_K, 'P', P_ATM, 'Air') * (1 + 0.0026 * W)             # viscosity [Pa·s]
-    visc_wall = PropsSI('VISCOSITY', 'T', T_wall_K, 'P', P_ATM, 'Air') * (1 + 0.0026 * W)       # viscosity at wall [Pa·s]
-
-    m_dot_min = m_dot - m_dot_cond
-
-    param_update_dict = {
-        "m_dot": m_dot,
-        "cp": cp,
-        "K_air": K_air,
-        "visc": visc,
-        "visc_wall": visc_wall,
-        "m_dot_min": m_dot_min
-    }
-
-    return param_update_dict
-
-def fixed_plate_inputs():
+def exchanger_inputs():
     """
     docstring
     """
@@ -137,7 +80,7 @@ def fixed_plate_inputs():
     Rprime_cond_1plate = plate_thickness / K_plates
 
     # return
-    fixed_plate_dict = {
+    exchanger_dict = {
         "K_plates": K_plates,
         "N_p": N_p,
         "L_p": L_p,
@@ -151,9 +94,9 @@ def fixed_plate_inputs():
         "Rprime_cond_1plate": Rprime_cond_1plate,
     }
 
-    return fixed_plate_dict
+    return exchanger_dict
 
-def thermal_resistance(param_update_dict, fixed_plate_dict):
+def thermal_resistance(param_update_dict, exchanger_dict):
     """
     Calculates the thermal resistance to convection of a single plate, and in total for one of the heat exchanger flows. To be applied to each flow.
 
@@ -194,11 +137,11 @@ def thermal_resistance(param_update_dict, fixed_plate_dict):
     visc = param_update_dict["visc"]
     visc_wall = param_update_dict["visc_wall"]
 
-    N_p = fixed_plate_dict["N_p"]
-    plate_width = fixed_plate_dict["plate_width"]
-    chevron_angle = fixed_plate_dict["chevron_angle"]
-    corr_ampl = fixed_plate_dict["corr_ampl"]
-    d_e = fixed_plate_dict["d_e"]
+    N_p = exchanger_dict["N_p"]
+    plate_width = exchanger_dict["plate_width"]
+    chevron_angle = exchanger_dict["chevron_angle"]
+    corr_ampl = exchanger_dict["corr_ampl"]
+    d_e = exchanger_dict["d_e"]
     
     G_ch = m_dot / (corr_ampl * plate_width * (N_p / 2))
     Re = (G_ch * d_e) / visc
@@ -245,7 +188,7 @@ def thermal_resistance(param_update_dict, fixed_plate_dict):
 
     return Rprime_conv_1plate                  #### does this need to be corrected? see slide 14, tema 6 IC 22-23
 
-def fixed_plate_UA(fixed_plate_dict, hot_param_update_dict, cold_param_update_dict):
+def calculate_UA(exchanger_dict, hot_param_update_dict, cold_param_update_dict):
     """
     Calculates U and A for a fixed-plate heat exchanger, based on information about its geometrical configuration.
 
@@ -278,12 +221,12 @@ def fixed_plate_UA(fixed_plate_dict, hot_param_update_dict, cold_param_update_di
         Total area used for heat transfer inside the heat exchanger [m2]
     """
     # input extraction
-    area = fixed_plate_dict["area"]
-    Rprime_cond_1plate = fixed_plate_dict["Rprime_cond_1plate"]
+    area = exchanger_dict["area"]
+    Rprime_cond_1plate = exchanger_dict["Rprime_cond_1plate"]
 
     # convective thermal resistance calculations
-    Rprime_conv_1plate_hot = thermal_resistance(hot_param_update_dict, fixed_plate_dict)         # hot flow
-    Rprime_conv_1plate_cold = thermal_resistance(cold_param_update_dict, fixed_plate_dict)      # cold flow
+    Rprime_conv_1plate_hot = thermal_resistance(hot_param_update_dict, exchanger_dict)         # hot flow
+    Rprime_conv_1plate_cold = thermal_resistance(cold_param_update_dict, exchanger_dict)      # cold flow
 
     Rprime_1plate = Rprime_cond_1plate + Rprime_conv_1plate_cold + Rprime_conv_1plate_hot
 
@@ -291,7 +234,7 @@ def fixed_plate_UA(fixed_plate_dict, hot_param_update_dict, cold_param_update_di
 
     return U_total, area
 
-def counterflow_output(P_ATM, inlet_std, hot_param_update_dict, cold_param_update_dict, area, U_total):
+def counterflow_output(P_ATM, inlet_std, hot_param_update_dict, cold_param_update_dict, area, U_total): ####NOT REFACTORED NOT REFACTORED THIS DOES HRV THINGS
     """
     Calculates NTU, epsilon, transferred heat and outlet temperatures for a fixed-plate counterflow heat exchanger.
 
