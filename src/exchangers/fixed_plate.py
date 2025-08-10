@@ -63,9 +63,10 @@ def exchanger_inputs():
     """
     docstring
     """
-    material = ut.input_validation("Available plate materials: ", "dict", display=plate_materials, aliases=material_aliases) # plate material (chosen from list)
+    print("\n\nFixed-plate heat exchanger configuration:")
+    material = ut.input_validation("\nAvailable plate materials: ", "dict", display=plate_materials, aliases=material_aliases) # plate material (chosen from list)
     K_plates = K_metals[material]
-    N_p = ut.input_validation("Enter number of plates: ", "int")                                    # number of plates
+    N_p = ut.input_validation("\nEnter number of plates: ", "int")                                    # number of plates
     L_p = ut.input_validation("Enter plate effective length [m]: ", "float")                        # plate effective length [m]
     plate_width = ut.input_validation("Enter plate width [m]: ", "float")                           # plate width [m]
     plate_thickness = ut.input_validation("Enter plate thickness [m]: ", "float")                   # plate thickness [m]
@@ -301,8 +302,8 @@ def counterflow_output(P_ATM, inlet_std, hot_param_update_dict, cold_param_updat
         q_lat_est = q_real - q_sens                         # latent heat estimate (used later)
 
         # h_fg is needed to determine the amount of condensate, which in turn is needed to determine W upon exit. h_fg is obtained via the air mixture's saturation pressure
-        p_sat = HAPropsSI('P', 'T', T_dew_hot_K, 'Q', 0, 'water')
-        h_fg = (HAPropsSI('H', 'P', p_sat, 'Q', 1, 'water')) - (HAPropsSI('H', 'P', p_sat, 'Q', 0, 'water'))
+        p_sat = PropsSI('P', 'T', T_dew_hot_K, 'Q', 0, 'water')
+        h_fg = (PropsSI('H', 'P', p_sat, 'Q', 1, 'water')) - (PropsSI('H', 'P', p_sat, 'Q', 0, 'water'))
         q_lat_max = (W_hot_in * m_dot_hot) * h_fg           # maximum latent heat that the airstream can release
         if q_lat_est <= q_lat_max:
             q_lat = q_lat_est

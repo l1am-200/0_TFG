@@ -35,7 +35,7 @@ def module_select(module_dict):
     """
     docstring
     """
-    print("\nSelect program module to work in:")
+    print("\nSelect program module:")
     for i, element in enumerate(module_dict):
         print(f"{i+1} : {module_dict[element]["name"]}")
     
@@ -45,6 +45,7 @@ def module_select(module_dict):
             module = element
     
     if module_dict[module]["modes"] is not None:
+        print("\n Select mode:")
         for i, element in enumerate(module_dict[module]["modes"]):
             print(f"{i+1} : {module_dict[module]["modes"][element]}")
 
@@ -65,12 +66,13 @@ def heat_ex_select(heat_ex_dict):
     for i, element in enumerate(heat_ex_dict):
         print(f"{i+1} : {heat_ex_dict[element]["name"]}")
     
-    user_num = ut.input_validation("Enter heat exchanger type number: ", "int", num_range=(1, len(heat_ex_dict)))
+    user_num = ut.input_validation("Enter type number: ", "int", num_range=(1, len(heat_ex_dict)))
     for i , element in enumerate(heat_ex_dict):
         if user_num == i+1:
             heat_ex_type = element
     
     if heat_ex_dict[heat_ex_type]["subtypes"] is not None:
+        print("\nSelect heat exchanger subtype:")
         for i, element in enumerate(heat_ex_dict[heat_ex_type]["subtypes"]):
             print(f"{i+1} : {heat_ex_dict[heat_ex_type]["subtypes"][element]}")
     
@@ -86,6 +88,11 @@ def heat_ex_select(heat_ex_dict):
 def exchanger_prefix(heat_ex_type):
     heat_ex_prefix = ut.file_management[heat_ex_type]
     return heat_ex_prefix
+
+
+# SAVING FILES:
+
+
 
 
 # ITERATION LOOP:

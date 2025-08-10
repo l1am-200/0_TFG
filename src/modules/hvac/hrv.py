@@ -6,18 +6,21 @@ houses things specific to Heat Recovery Ventilators (HRVs)
 
 import utils as ut
 import variable_sweeps as vs
+import core.metadata_mgmt as md
 import core.heatx as hx
 import exchangers.fixed_plate as fp
 
 from CoolProp.HumidAirProp import HAPropsSI
 from CoolProp.CoolProp import PropsSI
+import numpy as np
 
 # HRV inlet prompts:
 def inlet_prompts():
     """
     docstring
     """
-    T_ext_C = ut.input_validation("Enter exterior temperature [ºC]: ", "float")
+    print("\n\nHRV inlet configuration:")
+    T_ext_C = ut.input_validation("\nEnter exterior temperature [ºC]: ", "float")
     RH_ext = ut.input_validation("Enter exterior relative humidity [0-1]: ", "float", num_range=(0, 1))
     T_int_C = ut.input_validation("\nEnter interior temperature [ºC]: ", "float")
     RH_int = ut.input_validation("Enter interior relative humidity [0-1]: ", "float", num_range=(0, 1))
@@ -157,7 +160,7 @@ def param_update(P_ATM, T_avg_K, T_wall_K, W, v_dot, m_dot_cond=0):
 # Creation of standardized HRV inlet dictionary:
 def inlet_standard(P_ATM, hrv_input_dict):
     """
-    docstring
+    Converts user-specified HRV inputs to a standardized format for calculations, combined with additional HRV-specific parameters.
     """
     v_dot = hrv_input_dict["v_dot"]
 
@@ -232,16 +235,16 @@ def hrv_iteration(P_ATM, heat_ex_prefix, hrv_inlet_std, exchanger_dict):
         print("Calculations interrupted") ####placeholder
     
     calc_results = {
-        "q_real": q_real,
-        "T_hot_out_K": T_hot_out_K,
-        "T_cold_out_K": T_cold_out_K,
+        "q_real": float(np.round(q_real, 3)),
+        "T_hot_out_K": float(np.round(T_hot_out_K, 3)),
+        "T_cold_out_K": float(np.round(T_cold_out_K, 3)),
         "iteration_num": iteration_num
     }
     return calc_results
 
 
 # HRV function dispatch:
-def dispatch(P_ATM, sweep_ok, heat_ex_type):
+def dispatch(P_ATM, module, mode, sweep_ok, heat_ex_type):
     """
     docstring
     """
@@ -252,16 +255,68 @@ def dispatch(P_ATM, sweep_ok, heat_ex_type):
 
     calc_results_list = []
 
+    # variable sweep highjack dictionary setup:
+    highjack_targets = {
+        "hrv": hrv_input_dict,
+        "fixed_plate": exchanger_dict
+    }
+
+    ####CHECK THIS WHOLE BLOCK
     if sweep_ok == "y":
-        target_dict_list1, target_dict_list2 = vs.dispatch(hrv_input_dict, exchanger_dict) ####manually assigning var2 a dictionary, fix this!
-        for dict_var2 in target_dict_list2:
-            for dict_var1 in target_dict_list1:
-                hrv_inlet_std = inlet_standard(P_ATM, dict_var1)
-                calc_results = hrv_iteration(P_ATM, heat_ex_prefix, hrv_inlet_std, dict_var2)
+        highjacked = vs.dispatch(module, mode, heat_ex_type, highjack_targets)
+
+        if highjacked["target_dict_list"]["list"] is not None:
+            for dictionary in highjacked["target_dict_list"]["list"]:
+                comp = highjacked["target_dict_list"]["component"]
+                highjack_targets[comp] = dictionary
+
+                # metadata update
+                md.metadata_update(hrv_input_dict)
+                md.metadata_update(exchanger_dict)
+
+                hrv_inlet_std = inlet_standard(P_ATM, hrv_input_dict)
+                md.metadata_update(hrv_inlet_std) #overkill?
+                calc_results = hrv_iteration(P_ATM, heat_ex_prefix, hrv_inlet_std, exchanger_dict)
+                calc_results_list.append(calc_results)
+
+        elif highjacked["target_dict_list2"]["list"] is not None:
+            for dict_var2 in highjacked["target_dict_list2"]["list"]:
+                comp2 = highjacked["target_dict_list2"]["component"]
+                highjack_targets[comp2] = dict_var2
+                for dict_var1 in highjacked["target_dict_list1"]["list"]:
+                    comp1 = highjacked["target_dict_list1"]["component"]
+                    highjack_targets[comp1] = dict_var1
+
+                    # metadata update
+                    md.metadata_update(hrv_input_dict)
+                    md.metadata_update(exchanger_dict)
+
+                    hrv_inlet_std = inlet_standard(P_ATM, hrv_input_dict)
+                    md.metadata_update(hrv_inlet_std) #overkill?
+                    calc_results = hrv_iteration(P_ATM, heat_ex_prefix, hrv_inlet_std, exchanger_dict)
+                    calc_results_list.append(calc_results)
+        else:
+            for dictionary in highjacked["target_dict_list1"]["list"]:
+                comp = highjacked["target_dict_list1"]["component"]
+                highjack_targets[comp].clear()
+                highjack_targets[comp].update(dictionary)
+
+                # metadata update
+                md.metadata_update(hrv_input_dict)
+                md.metadata_update(exchanger_dict)
+
+                hrv_inlet_std = inlet_standard(P_ATM, hrv_input_dict)
+                md.metadata_update(hrv_inlet_std) #overkill?
+                calc_results = hrv_iteration(P_ATM, heat_ex_prefix, hrv_inlet_std, exchanger_dict)
                 calc_results_list.append(calc_results)
     else:
         hrv_inlet_std = inlet_standard(P_ATM, hrv_input_dict)
         calc_results = hrv_iteration(P_ATM, heat_ex_prefix, hrv_inlet_std, exchanger_dict)
         calc_results_list.append(calc_results)
+
+        # metadata update
+        md.metadata_update(hrv_input_dict)
+        md.metadata_update(hrv_inlet_std)
+        md.metadata_update(exchanger_dict)
     
     return calc_results_list

@@ -9,9 +9,9 @@ Essentially, what I need to do is take the chosen variables and values, and repl
 take my list of values for T_ext and insert that into the iteration function somehow.'''
 
 import utils as ut
-import core.heatx as hx
-import modules.hvac.hrv as hrv
-import exchangers.fixed_plate as fp
+import core.metadata_mgmt as md
+
+import copy
 import numpy as np
 
 # Sweep modes:
@@ -104,17 +104,18 @@ sweep_variables = {
 
 # Variable sweep prompts:
 def conduct_sweep():
-    sweep_ok = ut.input_validation("Conduct variable sweep? [y/n]: ", "y/n")
+    sweep_ok = ut.input_validation("\nConduct variable sweep? [y/n]: ", "y/n")
     return sweep_ok
 
 def select_sweep_mode():
     """
     docstring
     """
-    print("Select variable sweep mode:")
+    print("\n\nSelect variable sweep mode:")
     for i, mode in enumerate(sweep_modes):
         print(f"{i+1} : {mode}")
     sweep_mode = ut.input_validation("Enter mode number: ", "int", num_range=(1, len(sweep_modes)))
+    md.metadata_set("sweep_mode", sweep_mode)
     return sweep_mode
 
 # Function to filter by sweep type:
@@ -131,31 +132,48 @@ def highjack(target_dict, var, vals):
     """
     target_dict_list = []
     for val in vals:
-        target_dict[var] = val
-        target_dict_list.append(target_dict)
+        new_dict = target_dict.copy()
+        new_dict[var] = val
+        target_dict_list.append(new_dict)
     return target_dict_list
 
 # Function to set up variable sweeps:
-def sweep_setup(sweep_mode): ####not refactored, and missing module info: should not allow user to select a variable from a module different to the one running!
+def var_setup(input_dict, module, mode, heat_ex_type):
     """
     docstring
     """
-    print("Variable sweep setup:")
+    filtered_dict = {}
+
+    for key in input_dict:
+        if input_dict[key]["component"] in (module, mode, heat_ex_type):
+            filtered_dict[key] = input_dict[key]
+    var_list = list(filtered_dict.keys())
+
+    print(f"\nSelect variable to sweep:")
+    for i, var in enumerate(var_list):
+        print(f"{i+1} : {var} -> {filtered_dict[var]["label"]}")
+    
+    idx = ut.input_validation("Enter variable number: ", "int", num_range=(1, len(filtered_dict))) - 1
+    var = var_list[idx]
+    start = ut.input_validation("Sweep start value: ", "float")
+    stop = ut.input_validation("Sweep stop value: ", "float", num_range=(start, np.inf))
+    step = ut.input_validation("Step: ", "float", num_range=(0.001, stop))
+
+    num_points = int(round((stop - start) / step)) + 1
+    vals = np.linspace(start, stop, num_points)
+
+    return var, vals
+
+# Function to wrap variable sweeps:
+def sweep_setup(sweep_mode, module, mode, heat_ex_type):
+    """
+    docstring
+    """
+    print("\nVariable sweep setup:")
 
     # main variable
-    main_vars = sweep_type_filter("main")
-    main_keys = list(main_vars.keys())
-
-    print("Select main variable to sweep:")
-    for i, var in enumerate(main_keys):
-        print(f"{i+1} : {main_vars[var]["label"]}") ####can always change this to show the actual variable name
-    
-    main_idx = ut.input_validation("Enter variable number: ", "int", num_range=(1, len(main_keys))) - 1
-    var1 = main_keys[main_idx]
-    start1 = ut.input_validation("Sweep start value: ", "float") ####add num range somehow
-    stop1 = ut.input_validation("Sweep stop value: ", "float") ####same here
-    step1 = ut.input_validation("Step: ", "float") ####same here
-    vals1 = np.arange(start1, stop1, step1)
+    main_var_dict = sweep_type_filter("main")
+    var1, vals1 = var_setup(main_var_dict, module, mode, heat_ex_type)
 
     if sweep_mode == 1:
         sweep_params = {
@@ -167,19 +185,10 @@ def sweep_setup(sweep_mode): ####not refactored, and missing module info: should
         return sweep_params
     else:
         # secondary variable
-        sec_vars = sweep_type_filter("sec")
-        sec_keys = [key for key in sec_vars if key != var1]
-
-        print("Select secondary variable to sweep:")
-        for i, var in enumerate(sec_keys):
-            print(f"{i+1} : {sec_vars[var]["label"]}") ####can always change this to show the actual variable name
-        
-        sec_idx = ut.input_validation("Enter variable number: ", "int", num_range=(1, len(sec_keys)))
-        var2 = sec_keys[sec_idx]
-        start2 = ut.input_validation("Sweep start value: ", "float") ####add num range somehow
-        stop2 = ut.input_validation("Sweep stop value: ", "float") ####same here
-        step2 = ut.input_validation("Step: ", "float") ####same here
-        vals2 = np.arange(start2, stop2, step2)
+        sweep_variables_copy = copy.deepcopy(sweep_variables)
+        sweep_variables_copy.pop(var1)
+        sec_var_dict = sweep_variables_copy
+        var2, vals2 = var_setup(sec_var_dict, module, mode, heat_ex_type)
 
         sweep_params = {
             "var1": var1,
@@ -191,23 +200,66 @@ def sweep_setup(sweep_mode): ####not refactored, and missing module info: should
 
 
 # Function that handles all sweep logic:
-def dispatch(target_dict_var1, target_dict_var2):
+def dispatch(module, mode, heat_ex_type, highjack_targets):
     """
     docstring
     """
     # sweep setup
     sweep_mode = select_sweep_mode()
-    sweep_params = sweep_setup(sweep_mode)
+    sweep_params = sweep_setup(sweep_mode, module, mode, heat_ex_type)
 
     # parameter extraction
     var1 = sweep_params["var1"]
     var2 = sweep_params["var2"]
     vals1 = sweep_params["vals1"]
     vals2 = sweep_params["vals2"]
-    
-    target_dict_list1 = highjack(target_dict_var1, var1, vals1)
+
+    # metadata update (redundant?)
+    md.metadata_set("sweep_var1", var1)
+    md.metadata_set("sweep_vals1", vals1)
+    md.metadata_set("sweep_var2", var2)
+    md.metadata_set("sweep_vals2", vals2)
+
+    # target dictionary identification
+    component1 = sweep_variables[var1]["component"]
+    target_dict_var1 = highjack_targets[component1]    
+
     if var2 is not None:
-        target_dict_list2 = highjack(target_dict_var2, var2, vals2)
+        # target dictionary identification
+        component2 = sweep_variables[var2]["component"]
+        target_dict_var2 = highjack_targets[component2]
+
+        if component1 == component2:
+            list_of_lists = []
+            target_dict_list2 = highjack(target_dict_var2, var2, vals2)
+            for target_dict in target_dict_list2:
+                target_dict_list1 = highjack(target_dict, var1, vals1)
+                list_of_lists.extend(target_dict_list1)
+            target_dict_list = list_of_lists
+        else:
+            target_dict_list2 = highjack(target_dict_var2, var2, vals2)
+            target_dict_list1 = highjack(target_dict_var1, var1, vals1)
+            target_dict_list = None
+
     else:
-        target_dict_list2 = target_dict_var2
-    return target_dict_list1, target_dict_list2
+        target_dict_list1 = highjack(target_dict_var1, var1, vals1)
+        target_dict_list2 = None
+        target_dict_list = None
+        component2 = None
+    
+    highjacked = {
+        "target_dict_list1": {
+            "list": target_dict_list1,
+            "component": component1
+        },
+        "target_dict_list2": {
+            "list": target_dict_list2,
+            "component": component2
+        },
+        "target_dict_list": {
+            "list": target_dict_list,
+            "component": component1 #abitrary, as target_dict_list is not None when component1 == component2
+        }
+    }
+
+    return highjacked
