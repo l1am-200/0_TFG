@@ -1,7 +1,11 @@
 # TFG
 # Script housing a series of functions used throughout the program ((work on this))
 
+import json
+import numpy as np
+
 # Import management:
+import core.config as config
 import core.heatx as hx
 import analysis.plots as pl
 import modules.hvac.hrv as hrv
@@ -85,3 +89,39 @@ def validate_dict(prompt, display, aliases):
             return aliases[user_input]
         else:
             print("Invalid input. Please enter one of the displayed options.")
+
+
+# DATA SERIALIZATION:
+
+# JSON:
+
+# JSON 
+def json_cleanup(obj):
+    """
+    docstring
+    """
+    if isinstance(obj, dict):
+        return {key: json_cleanup(val) for key, val in obj.items()}
+    elif isinstance(obj, list):
+        return [json_cleanup(entry) for entry in obj]
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, (np.float16, np.float32, np.float64)):
+        return float(np.round(obj, 3))
+    elif isinstance(obj, (np.int16, np.int32, np.int64)):
+        return int(obj)
+    elif obj is None or isinstance(obj, (str, int, float)):
+        return obj
+    
+# JSON export:
+def json_export(*dicts):
+    """
+    docstring
+    entries must already be cleaned!
+    """
+    final_json = {f"dict_{i+1}": d for i, d in enumerate(dicts)}
+    filename = f"run_{config.EXPORT_FOLDER}.json"
+    filepath = config.EXPORT_DIR / filename
+    with open(filepath, "w") as f:
+        json.dump(final_json, f, indent=2)
+

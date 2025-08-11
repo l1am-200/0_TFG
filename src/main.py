@@ -2,19 +2,8 @@
 
 ''' WHAT'S LEFT TO DO:
 
-        Input validation:
-    - directory input validation.
-
-        Plotting and analysis:
-    - create new file (analysis.py or something like that) containing all necessary functions for plotting and analysis
-    - these shall be called from main.py, and using the results lists and metadata they should be able to create plots and analyse the results
-
         Results:
-    - numbers should be rounded to 3 or 4 decimals.
     - humidity-related outlet data is currently not included and should be added.
-
-        Saving results (and plots):
-    - implement option to save files containing test data and the plots used for analysis.
 
         Final review:
     - review all files, complete docstrings, resolve and remove any annotations left behind.
@@ -42,6 +31,10 @@
 
         Input/Output refactor:
     - all user inputs should be handled via a separate module.
+
+        Saving mechanics:
+    - currently creating a timestamped folder for each "run", saving a timestamped .json which contains the results and the metadata. this could be changed to be more clear
+    or user-friendly.
 
         More specific:
     - chevron angle input in fixed_plate.py accepts any integer, but the calculation process will throw an error if the entered value is not one of the values that work for
@@ -102,7 +95,7 @@ def main():
             print("\nHRV calculations conducted successfully.")
         
         # Result plotting:
-        end_metadata = md.metadata_fetch()
+        end_metadata = ut.json_cleanup(md.metadata_fetch())
         if sweep_ok == "y":
             plots.plot_dispatch(calc_results_list, end_metadata)
         else:
@@ -110,6 +103,9 @@ def main():
             print(calc_results_list) #temporary
             print("\nMetadata:")
             print(end_metadata) #temporary
+        
+        # Save results and metadata to folder:
+        ut.json_export(end_metadata, calc_results_list)
     
     except KeyboardInterrupt:
         print("\nProgram interrupted")
