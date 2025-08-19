@@ -132,7 +132,7 @@ def highjack(target_dict, var, vals):
     """
     target_dict_list = []
     for val in vals:
-        new_dict = target_dict.copy()
+        new_dict = copy.deepcopy(target_dict)
         new_dict[var] = val
         target_dict_list.append(new_dict)
     return target_dict_list
@@ -234,7 +234,8 @@ def dispatch(module, mode, heat_ex_type, highjack_targets):
             target_dict_list2 = highjack(target_dict_var2, var2, vals2)
             for target_dict in target_dict_list2:
                 target_dict_list1 = highjack(target_dict, var1, vals1)
-                list_of_lists.extend(target_dict_list1)
+                tdl1_extendable = copy.deepcopy(target_dict_list1)
+                list_of_lists.extend(tdl1_extendable)
             target_dict_list = list_of_lists
         else:
             target_dict_list2 = highjack(target_dict_var2, var2, vals2)

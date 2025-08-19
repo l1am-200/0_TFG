@@ -13,6 +13,7 @@ import exchangers.fixed_plate as fp
 from CoolProp.HumidAirProp import HAPropsSI
 from CoolProp.CoolProp import PropsSI
 import numpy as np
+import copy
 
 # HRV inlet prompts:
 def inlet_prompts():
@@ -265,54 +266,44 @@ def dispatch(P_ATM, module, mode, sweep_ok, heat_ex_type):
     if sweep_ok == "y":
         highjacked = vs.dispatch(module, mode, heat_ex_type, highjack_targets)
 
+        def run_one_case():
+            current_hrv = highjack_targets["hrv"]
+            current_exchanger = highjack_targets["fixed_plate"]
+
+            md.metadata_update(current_hrv)
+            md.metadata_update(current_exchanger)
+
+            hrv_inlet_std = inlet_standard(P_ATM, current_hrv)
+            md.metadata_update(hrv_inlet_std)
+
+            calc_results = hrv_iteration(P_ATM, heat_ex_prefix, hrv_inlet_std, current_exchanger)
+            calc_results_list.append(copy.deepcopy(calc_results))
+
         if highjacked["target_dict_list"]["list"] is not None:
-            for dictionary in highjacked["target_dict_list"]["list"]:
-                comp = highjacked["target_dict_list"]["component"]
-                highjack_targets[comp] = dictionary
-
-                # metadata update
-                md.metadata_update(hrv_input_dict)
-                md.metadata_update(exchanger_dict)
-
-                hrv_inlet_std = inlet_standard(P_ATM, hrv_input_dict)
-                md.metadata_update(hrv_inlet_std) #overkill?
-                calc_results = hrv_iteration(P_ATM, heat_ex_prefix, hrv_inlet_std, exchanger_dict)
-                calc_results_list.append(calc_results)
+            comp = highjacked["target_dict_list"]["component"]
+            for case_dict in highjacked["target_dict_list"]["list"]:
+                highjack_targets[comp] = copy.deepcopy(case_dict)
+                run_one_case()
 
         elif highjacked["target_dict_list2"]["list"] is not None:
+            comp2 = highjacked["target_dict_list2"]["component"]
+            comp1 = highjacked["target_dict_list1"]["component"]
             for dict_var2 in highjacked["target_dict_list2"]["list"]:
-                comp2 = highjacked["target_dict_list2"]["component"]
-                highjack_targets[comp2] = dict_var2
+                highjack_targets[comp2] = copy.deepcopy(dict_var2)
                 for dict_var1 in highjacked["target_dict_list1"]["list"]:
-                    comp1 = highjacked["target_dict_list1"]["component"]
-                    highjack_targets[comp1] = dict_var1
+                    highjack_targets[comp1] = copy.deepcopy(dict_var1)
+                    run_one_case()
 
-                    # metadata update
-                    md.metadata_update(hrv_input_dict)
-                    md.metadata_update(exchanger_dict)
-
-                    hrv_inlet_std = inlet_standard(P_ATM, hrv_input_dict)
-                    md.metadata_update(hrv_inlet_std) #overkill?
-                    calc_results = hrv_iteration(P_ATM, heat_ex_prefix, hrv_inlet_std, exchanger_dict)
-                    calc_results_list.append(calc_results)
         else:
-            for dictionary in highjacked["target_dict_list1"]["list"]:
-                comp = highjacked["target_dict_list1"]["component"]
-                highjack_targets[comp].clear()
-                highjack_targets[comp].update(dictionary)
+            comp = highjacked["target_dict_list1"]["component"]
+            for case_dict in highjacked["target_dict_list1"]["list"]:
+                highjack_targets[comp] = copy.deepcopy(case_dict)
+                run_one_case()
 
-                # metadata update
-                md.metadata_update(hrv_input_dict)
-                md.metadata_update(exchanger_dict)
-
-                hrv_inlet_std = inlet_standard(P_ATM, hrv_input_dict)
-                md.metadata_update(hrv_inlet_std) #overkill?
-                calc_results = hrv_iteration(P_ATM, heat_ex_prefix, hrv_inlet_std, exchanger_dict)
-                calc_results_list.append(calc_results)
     else:
         hrv_inlet_std = inlet_standard(P_ATM, hrv_input_dict)
         calc_results = hrv_iteration(P_ATM, heat_ex_prefix, hrv_inlet_std, exchanger_dict)
-        calc_results_list.append(calc_results)
+        calc_results_list.append(copy.deepcopy(calc_results))
 
         # metadata update
         md.metadata_update(hrv_input_dict)

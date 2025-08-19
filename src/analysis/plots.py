@@ -72,7 +72,7 @@ def plot_2d(calc_results_list, metadata, y_var):
 
     # create a list of lists of points for the y-axis:
     y_array = []
-    for i in enumerate(series_vals):
+    for i, thing in enumerate(series_vals):
         y_extract = []
         start_idx = i * len(x_array)
         for y_val_idx in range(len(x_array)):
